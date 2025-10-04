@@ -52,17 +52,21 @@ def rollDiceEnder(word, sentenceLen):
 
 # ask user for file input, store file content
 allContent = []
-print('gimme a file')
-filename = input()
-while (filename != '-1'):
-    if not os.path.exists(filename):
-        print('yeah i dont see that one. Try again')
-        filename = input()
-        continue
-    fileContent = open(filename, "r").read()
-    allContent.append(fileContent)
-    print('Gimme another file or enter -1 to continue to wamble-gpt')
-    filename = input()
+# print('gimme a file')
+# filename = input()
+# while (filename != '-1'):
+#    if not os.path.exists(filename):
+#        print('yeah i dont see that one. Try again')
+#        filename = input()
+#        continue
+#    fileContent = open(filename, "r").read()
+#    allContent.append(fileContent)
+#    print('Gimme another file or enter -1 to continue to wamble-gpt')
+#    filename = input()
+
+filename = 'test_files/independence.txt'
+fileContent = open(filename, "r").read()
+allContent.append(fileContent)
 
 # split each file's text into words delimited by spaces
 # TODO: generate POS tags for all words
