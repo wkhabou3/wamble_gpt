@@ -1,6 +1,7 @@
 import os
 import random
 import numpy as np
+import re
 
 # constants
 # TODO: There are special combinations of characters like ellipsiseses. What's the best way to track these
@@ -100,6 +101,20 @@ for i in allContent:
 
 del allContent
 
+allWordsCount = sum([len(i) for i in allWords])
+if allWordsCount == 0:
+    print("no words, can't continue")
+    exit()
+
+if allWordsCount == 1:
+    output = ''
+    numWords = 100
+    singleWord = allWords[0][0]
+    for i in range(numWords):
+        output += singleWord + ' '
+    print(output)
+    exit()
+
 # remove unwanted punctuation, and sentence-ending punctuation sound be separate elements
 allPunctuated = []
 for i in allWords:
@@ -107,11 +122,14 @@ for i in allWords:
     for j in i:
         if j[-1] in punctuation_ignore:
             j = j[0:-1]
-        if j[-1] in punctuation_types:
-            currPunctuated.append(j[0:-1])
-            currPunctuated.append(j[-1])
-            continue
-        currPunctuated.append(j)
+        # use regex to find punctuation patterns - word followed by any superset of [.!?]
+        pattern = '([.!?]+)|(\w+(?:[-\',]\w+)*,?)'
+        matches = re.findall(pattern, j)
+        for punct, w in matches:
+            if w:
+                currPunctuated.append(w.lower())
+            elif punct:
+                currPunctuated.append(punct)
     allPunctuated.append(currPunctuated)
 
 del allWords
@@ -130,12 +148,12 @@ for i in allPunctuated:
         currWord = i[j]
         nextWord = i[j + 1]
         # Case 1: current word is a punctuation mark. Do nothing
-        if currWord in punctuation_types:
+        if currWord[0] in punctuation_types:
             continue
         # Case 2: current word comes before a punctuation. Then:
         # - add word as a key of sentenceEnders. increase weight of corresponding punctuation by 1
         # - add 1 to total weight of all punctuation associated with the word
-        elif nextWord in punctuation_types:
+        elif nextWord[0] in punctuation_types:
             if currWord in sentenceEnders:
                 if nextWord in sentenceEnders[currWord]:
                     sentenceEnders[currWord][nextWord] += 1
@@ -148,7 +166,7 @@ for i in allPunctuated:
         # Case 3: current word comes after punctuation. Then:
         # - add word as a key of sentenceStarters. Increase its weight by 1
         # - add 1 to sum total weight of all sentence starters
-        elif i[j - 1] in punctuation_types:
+        elif i[j - 1][0] in punctuation_types or j == 0:
             if currWord in sentenceStarters:
                 sentenceStarters[currWord] += 1
             else:
@@ -167,6 +185,20 @@ for i in allPunctuated:
         else:
             markovModel[currWord] = {nextWord: 1}
             weights[currWord] = 1
+    if len(i) == 0:
+        continue
+    lastWord = i[-1]
+    if lastWord not in punctuation_types:
+        if lastWord in sentenceEnders:
+            if '.' in sentenceEnders[lastWord]:
+                sentenceEnders[lastWord]['.'] += 1
+            else:
+                sentenceEnders[lastWord]['.'] = 1
+            enderWeights[lastWord] += 1
+        else:
+            sentenceEnders[lastWord] = {'.': 1}
+            enderWeights[lastWord] = 1
+
 
 # We are making an n-tuple markov model, {(word1, word2): {word3, weight}}
 # We have to keep track of prevWord when generating to add this functionality
@@ -204,12 +236,11 @@ prevWord = ''
 
 for i in range(numWords):
     # Starting a sentence
-    if currWordCount == 0:
+    if currWordCount == 0 or currWord[0] in punctuation_types:
         prevWord = currWord
         currWord = rollDiceStarter()
-        output += ' ' + currWord
+        output += ' ' + currWord.capitalize()
         currWordCount += 1
-        currWord = currWord.lower()
         continue
     # Finding a sentence ender
     if currWord in sentenceEnders:
@@ -217,7 +248,12 @@ for i in range(numWords):
         endSentence, punctuation = rollDiceEnder(currWord, currWordCount)
         if (not endSentence) and (currWord in markovModel):
             currWord = rollDice(currWord)
-            output += ' ' + currWord
+            if currWord[0] in punctuation_types:
+                output += currWord
+                currWordCount = 0
+            else:
+                output += ' ' + currWord
+                currWordCount += 1
         else:
             if (not punctuation):
                 punctuation = '.'
@@ -233,16 +269,21 @@ for i in range(numWords):
     # 2-tuple Markov chain
     if (prevWord, currWord) in markovTuple:
         prevWord, currWord = rollDiceTuple(prevWord, currWord)
-        output += ' ' + currWord
-        if currWord in punctuation_types:
+        if currWord[0] in punctuation_types:
+            output += currWord
             currWordCount = 0
         else:
+            output += ' ' + currWord
             currWordCount += 1
         continue
     # Everything else
     prevWord = currWord
     currWord = rollDice(currWord)
-    output += ' ' + currWord
-    currWordCount += 1
+    if currWord[0] in punctuation_types:
+        output += currWord
+        currWordCount = 0
+    else:
+        output += ' ' + currWord
+        currWordCount += 1
 
 print(output)
